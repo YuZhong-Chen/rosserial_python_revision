@@ -62,12 +62,10 @@ class Publisher:
         m.deserialize(data)
         self.publisher.publish(m)
 
-
 class Subscriber:
     """
         Subscriber forwards messages from ROS to the serial device.
     """
-
     def __init__(self, topic_info, parent):
         self.topic = topic_info.topic_name
         self.id = topic_info.topic_id
@@ -307,12 +305,6 @@ class SerialClient(object):
             except IOError as exc:
                 rospy.logwarn('Last read step: %s' % read_step)
                 rospy.logwarn('Run loop error: %s' % exc)
-                # One of the read calls had an issue. Just to be safe, request that the client
-                # reinitialize their topics.
-                with self.read_lock:
-                    self.port.flushInput()
-                with self.write_lock:
-                    self.port.flushOutput()
                 self.requestTopics()
         self.write_thread.join()
 
