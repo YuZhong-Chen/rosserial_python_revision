@@ -146,6 +146,8 @@ class SerialClient(object):
         self.callbacks[TopicInfo.ID_SUBSCRIBER] = self.setupSubscriber
         
         self.callbacks[TopicInfo.ID_TIME] = self.handleTimeRequest
+        
+        rospy.loginfo("Start at timeout : " + str(self.timeout))
 
     def requestTopics(self):
         """ Determine topics to subscribe/publish. """

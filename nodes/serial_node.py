@@ -13,15 +13,15 @@ if __name__=="__main__":
 
     port_name = rospy.get_param('~port','/dev/ttyUSB0')
     baud = int(rospy.get_param('~baud','57600'))
-
-    sys.argv = rospy.myargv(argv=sys.argv)
-    if len(sys.argv) >= 2 :
-        port_name  = sys.argv[1]
+    timeout = float(rospy.get_param('~timeout','1.0'))
+    
+    # TODO
+    isMega2560 = False 
    
     while not rospy.is_shutdown():
         rospy.loginfo("Connecting to %s at %d baud" % (port_name,baud) )
         try:
-            client = SerialClient(port_name, baud)
+            client = SerialClient(port_name, baud, timeout)
             client.run()
         except KeyboardInterrupt:
             break
