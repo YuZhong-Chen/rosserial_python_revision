@@ -1,0 +1,13 @@
+<launch>
+    <!-- Parameter -->
+    <arg name="baud" default="115200" />
+    <arg name="port" default="/dev/USB2" />
+
+    <!--  Node  -->
+    <node pkg="rosserial_python" type="serial_node.py" name="rosserial_python_revision" output="screen">
+        <param name="port" value="$(arg port)" />
+        <param name="baud" value="$(arg baud)" />
+    </node>
+
+
+</launch>
