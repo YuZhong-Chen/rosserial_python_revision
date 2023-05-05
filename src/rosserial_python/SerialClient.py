@@ -156,11 +156,14 @@ class SerialClient(object):
             with self.write_lock:
                 while True:
                     try:
-                        if self.port != None:
+                        if self.port == None:
+                            self.port = Serial(self.com_port, self.com_baud, timeout=self.timeout, write_timeout=10)
+                            time.sleep(1)
+                        else:
                             self.port.close()
+                            time.sleep(1)  
+                            self.port.open() 
                             time.sleep(1) 
-                        self.port = Serial(self.com_port, self.com_baud, timeout=self.timeout, write_timeout=10)
-                        time.sleep(1) 
                         break
                     except SerialException:
                         time.sleep(1)
@@ -170,7 +173,6 @@ class SerialClient(object):
 
     def txStopRequest(self):
         """ Send stop tx request to client before the node exits. """
-        
         with self.read_lock:
             self.port.flushInput()
 
@@ -214,7 +216,7 @@ class SerialClient(object):
         self.lastsync = rospy.Time.now()
 
         while self.write_thread.is_alive() and not rospy.is_shutdown():
-            if (rospy.Time.now() - self.lastsync).to_sec() > (self.timeout * 3):
+            if (rospy.Time.now() - self.lastsync).to_sec() > (self.timeout * 1.2):
                 if self.synced:
                     rospy.logerr("Lost sync with device, restarting...")
                 else:
