@@ -8,3 +8,11 @@ The program will restart the serial port when the device is disconnected, it sho
 If you want to check the connection more frequently,  
 not only need to change the timeout in this package but also change the timeout in the device,  
 where is located in the node_handle.h with ```SYNC_SECONDS```.
+
+## NOTE
+
+You should install rosserial_msgs.  
+
+```=
+sudo apt install ros-noetic-rosserial_msgs
+```  
