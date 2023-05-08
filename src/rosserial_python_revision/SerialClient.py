@@ -184,7 +184,7 @@ class SerialClient(object):
                                 self.port.flushInput()              
                             break
                         except SerialException:
-                            rospy.logerr("Unable to connect to device. Try to reconnecting ...")
+                            rospy.logerr("Unable to connect to device %s. Try to reconnecting ..." % self.com_port)
                             time.sleep(1)
                             continue
                         except:
@@ -249,7 +249,7 @@ class SerialClient(object):
                 if self.synced:
                     rospy.logerr("Lost sync with device, restarting...")
                 else:
-                    rospy.logerr("Unable to sync with device; possible link problem or wrong node_handle's frequency.")
+                    rospy.logerr("Unable to sync with device %s; possible link problem or wrong node_handle's frequency." % self.com_port)
                 self.requestTopics()
                 self.lastsync = rospy.Time.now()
 
