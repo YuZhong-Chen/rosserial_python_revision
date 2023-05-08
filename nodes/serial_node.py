@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
-from rosserial_python import SerialClient
+from rosserial_python_revision import SerialClient
 from serial import SerialException
 from time import sleep
 
