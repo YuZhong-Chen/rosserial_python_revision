@@ -157,7 +157,7 @@ class SerialClient(object):
         
         if self.port != None:
             self.reconnect_count += 1
-            rospy.loginfo('Requesting topics ... ( %d times )' % self.reconnect_count)
+            rospy.loginfo('Requesting topics ... ( Device %s : %d times )' % (self.com_port, self.reconnect_count))
         else:
             rospy.loginfo('Requesting topics ...')
 
