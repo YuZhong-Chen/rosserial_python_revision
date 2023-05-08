@@ -52,7 +52,7 @@ class Publisher:
         package, message = topic_info.message_type.split('/')
         self.message = load_message(package, message)
         if self.message._md5sum == topic_info.md5sum:
-            self.publisher = rospy.Publisher(self.topic, self.message, queue_size=10)
+            self.publisher = rospy.Publisher(self.topic, self.message, queue_size=100)
         else:
             raise Exception('Checksum does not match: ' + self.message._md5sum + ',' + topic_info.md5sum)
 
@@ -102,7 +102,7 @@ class SerialClient(object):
     protocol_ver2 = b'\xfe'
     protocol_ver = protocol_ver2
 
-    def __init__(self, port='/dev/ttyUSB0', baud=57600, timeout=1.0):
+    def __init__(self, port='/dev/ttyUSB0', baud=115200, timeout=1.0, isMega2560=False):
         """ Initialize node, connect to bus, attempt to negotiate topics. """
 
         self.read_lock = threading.RLock()
@@ -112,7 +112,6 @@ class SerialClient(object):
         self.write_thread = None
 
         self.lastsync = rospy.Time(0)
-        self.lastsync_lost = rospy.Time(0)
         self.lastsync_success = rospy.Time(0)
         self.last_read = rospy.Time(0)
         self.last_write = rospy.Time(0)
@@ -122,16 +121,20 @@ class SerialClient(object):
         self.port = None
         self.com_port = port
         self.com_baud = baud
+        
+        self.isMega2560 = isMega2560
+        
+        self.reconnect_count = 0
 
         self.publishers = dict()  # id:Publishers
         self.subscribers = dict() # topic:Subscriber
         
         def shutdown():
+            if self.port == None:
+                return
             self.txStopRequest()
             rospy.loginfo('shutdown hook activated')
         rospy.on_shutdown(shutdown)
-        
-        self.pub_diagnostics = rospy.Publisher('/diagnostics', diagnostic_msgs.msg.DiagnosticArray, queue_size=10)
 
         if rospy.is_shutdown():
             return
@@ -151,30 +154,53 @@ class SerialClient(object):
 
     def requestTopics(self):
         """ Determine topics to subscribe/publish. """
-        rospy.loginfo('Requesting topics...')
+        
+        if self.port != None:
+            self.reconnect_count += 1
+            rospy.loginfo('Requesting topics ... ( %d times )' % self.reconnect_count)
+        else:
+            rospy.loginfo('Requesting topics ...')
 
-        # acquire the read lock
-        with self.read_lock:
-            with self.write_lock:
+        # acquire the r / w lock
+        with self.read_lock, self.write_lock:
                 while True:
                     try:
+                        # First connect to the serial port.
                         if self.port == None:
-                            self.port = Serial(self.com_port, self.com_baud, timeout=self.timeout, write_timeout=10)
+                            self.port = Serial(self.com_port, self.com_baud, timeout=0)
                             time.sleep(1)
-                        else:
+                        
+                        # Reconnect for arduino mega (Close and re-open the serial port)
+                        elif self.isMega2560:
                             self.port.close()
-                            time.sleep(1)  
+                            time.sleep(1)                    
                             self.port.open() 
                             time.sleep(1) 
+                        
+                        # Reconnect for stm32 (Flush the buffer)
+                        else:
+                            self.port.flushInput()    
+                                              
                         break
+                    except KeyboardInterrupt:
+                        rospy.logerr("Keyboard Interrupt while opening serial port.")
+                        return
                     except SerialException:
+                        rospy.logerr("Unable to connect to device. Try to reconnecting ...")
                         time.sleep(1)
+                        continue
+                    except:
+                        rospy.logwarn("Unexpected Error: %s\nReconnecting ...", sys.exc_info()[0])
+                        return
 
         # request topic sync
         self.write_queue.put(self.header + self.protocol_ver + b"\x00\x00\xff\x00\x00\xff")
-
+        
     def txStopRequest(self):
         """ Send stop tx request to client before the node exits. """
+        if self.port == None:
+            return
+        
         with self.read_lock:
             self.port.flushInput()
 
@@ -186,7 +212,7 @@ class SerialClient(object):
             read_start = time.time()
             bytes_remaining = length
             result = bytearray()
-            while bytes_remaining != 0 and time.time() - read_start < self.timeout:
+            while bytes_remaining != 0 and time.time() - read_start < 0.5:
                 with self.read_lock:
                     received = self.port.read(bytes_remaining)
                 if len(received) != 0:
@@ -218,13 +244,11 @@ class SerialClient(object):
         self.lastsync = rospy.Time.now()
 
         while self.write_thread.is_alive() and not rospy.is_shutdown():
-            if (rospy.Time.now() - self.lastsync).to_sec() > (self.timeout * 1.2):
+            if (rospy.Time.now() - self.lastsync).to_sec() > (self.timeout):
                 if self.synced:
                     rospy.logerr("Lost sync with device, restarting...")
                 else:
-                    rospy.logerr("Unable to sync with device; possible link problem or wrong version of rosserial_python.")
-                self.lastsync_lost = rospy.Time.now()
-                self.sendDiagnostics(diagnostic_msgs.msg.DiagnosticStatus.ERROR, ERROR_NO_SYNC)
+                    rospy.logerr("Unable to sync with device; possible link problem or wrong node_handle's frequency.")
                 self.requestTopics()
                 self.lastsync = rospy.Time.now()
 
@@ -425,27 +449,3 @@ class SerialClient(object):
                     except RuntimeError as exc:
                         rospy.logerr('Write thread exception: %s' % exc)
                         break
-
-
-    def sendDiagnostics(self, level, msg_text):
-        msg = diagnostic_msgs.msg.DiagnosticArray()
-        status = diagnostic_msgs.msg.DiagnosticStatus()
-        status.name = "rosserial_python"
-        msg.header.stamp = rospy.Time.now()
-        msg.status.append(status)
-
-        status.message = msg_text
-        status.level = level
-
-        status.values.append(diagnostic_msgs.msg.KeyValue())
-        status.values[0].key="last sync"
-        if self.lastsync.to_sec()>0:
-            status.values[0].value=time.ctime(self.lastsync.to_sec())
-        else:
-            status.values[0].value="never"
-
-        status.values.append(diagnostic_msgs.msg.KeyValue())
-        status.values[1].key="last sync lost"
-        status.values[1].value=time.ctime(self.lastsync_lost.to_sec())
-
-        self.pub_diagnostics.publish(msg)
