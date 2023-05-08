@@ -173,7 +173,7 @@ class SerialClient(object):
                                 time.sleep(1)
                             
                             # Reconnect for arduino mega (Close and re-open the serial port)
-                            elif self.isMega2560:
+                            elif self.isMega2560 or not self.port.is_open:
                                 self.port.close()
                                 time.sleep(1)                    
                                 self.port.open() 
@@ -199,7 +199,7 @@ class SerialClient(object):
         
     def txStopRequest(self):
         """ Send stop tx request to client before the node exits. """
-        if self.port == None:
+        if self.port == None or not self.port.is_open:
             return
         
         with self.read_lock:
@@ -401,9 +401,12 @@ class SerialClient(object):
         Assumes the data is formatting as a packet. http://wiki.ros.org/rosserial/Overview/Protocol
         """
         with self.write_lock:
-            self.port.write(data)
-            self.last_write = rospy.Time.now()
-
+            if self.port.is_open:
+                self.port.write(data)
+            else:
+                rospy.logerr("Port is closed while writing. Device %s." % self.com_port)
+        self.last_write = rospy.Time.now()
+        
     def _send(self, topic, msg_bytes):
         """
         Send a message on a particular topic to the device.
