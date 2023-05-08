@@ -162,7 +162,8 @@ class SerialClient(object):
             rospy.loginfo('Requesting topics ...')
 
         # acquire the r / w lock
-        with self.read_lock, self.write_lock:
+        with self.read_lock:
+            with self.write_lock:
                 while True:
                     try:
                         # First connect to the serial port.
