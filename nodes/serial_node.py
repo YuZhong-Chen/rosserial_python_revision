@@ -9,7 +9,7 @@ import sys
 
 if __name__=="__main__":
     rospy.init_node("serial_node")
-    rospy.loginfo("ROS Serial Python Node")
+    rospy.loginfo("ROS Serial Python Revision Node")
 
     port_name = rospy.get_param('~port','/dev/ttyUSB0')
     baud = int(rospy.get_param('~baud','57600'))
