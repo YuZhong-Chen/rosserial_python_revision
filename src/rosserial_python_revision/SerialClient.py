@@ -164,35 +164,35 @@ class SerialClient(object):
         # acquire the r / w lock
         with self.read_lock:
             with self.write_lock:
-                while True:
-                    try:
-                        # First connect to the serial port.
-                        if self.port == None:
-                            self.port = Serial(self.com_port, self.com_baud, timeout=0)
+                try:
+                    while not rospy.is_shutdown():
+                        try:
+                            # First connect to the serial port.
+                            if self.port == None:
+                                self.port = Serial(self.com_port, self.com_baud, timeout=0)
+                                time.sleep(1)
+                            
+                            # Reconnect for arduino mega (Close and re-open the serial port)
+                            elif self.isMega2560:
+                                self.port.close()
+                                time.sleep(1)                    
+                                self.port.open() 
+                                time.sleep(1) 
+                            
+                            # Reconnect for stm32 (Flush the buffer)
+                            else:
+                                self.port.flushInput()              
+                            break
+                        except SerialException:
+                            rospy.logerr("Unable to connect to device. Try to reconnecting ...")
                             time.sleep(1)
-                        
-                        # Reconnect for arduino mega (Close and re-open the serial port)
-                        elif self.isMega2560:
-                            self.port.close()
-                            time.sleep(1)                    
-                            self.port.open() 
-                            time.sleep(1) 
-                        
-                        # Reconnect for stm32 (Flush the buffer)
-                        else:
-                            self.port.flushInput()    
-                                              
-                        break
-                    except KeyboardInterrupt:
-                        rospy.logerr("Keyboard Interrupt while opening serial port.")
-                        return
-                    except SerialException:
-                        rospy.logerr("Unable to connect to device. Try to reconnecting ...")
-                        time.sleep(1)
-                        continue
-                    except:
-                        rospy.logwarn("Unexpected Error: %s\nReconnecting ...", sys.exc_info()[0])
-                        return
+                            continue
+                        except:
+                            rospy.logwarn("Unexpected Error: %s\nReconnecting ...", sys.exc_info()[0])
+                            return
+                except KeyboardInterrupt:
+                    rospy.logerr("Keyboard Interrupt while opening serial port.")
+                    return
 
         # request topic sync
         self.write_queue.put(self.header + self.protocol_ver + b"\x00\x00\xff\x00\x00\xff")
