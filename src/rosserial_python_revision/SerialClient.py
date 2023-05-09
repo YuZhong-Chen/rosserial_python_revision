@@ -112,9 +112,6 @@ class SerialClient(object):
         self.write_thread = None
 
         self.lastsync = rospy.Time(0)
-        self.lastsync_success = rospy.Time(0)
-        self.last_read = rospy.Time(0)
-        self.last_write = rospy.Time(0)
         self.timeout = timeout
         self.synced = False
 
@@ -173,7 +170,7 @@ class SerialClient(object):
                                 time.sleep(1)
                             
                             # Reconnect for arduino mega (Close and re-open the serial port)
-                            elif self.isMega2560 or not self.port.is_open:
+                            elif self.isMega2560 or not self.port.writable():
                                 self.port.close()
                                 time.sleep(1)                    
                                 self.port.open() 
@@ -181,7 +178,7 @@ class SerialClient(object):
                             
                             # Reconnect for stm32 (Flush the buffer)
                             else:
-                                self.port.flushInput()              
+                                self.port.flushInput()
                             break
                         except SerialException:
                             rospy.logerr("Unable to connect to device %s. Try to reconnecting ..." % self.com_port)
@@ -199,7 +196,7 @@ class SerialClient(object):
         
     def txStopRequest(self):
         """ Send stop tx request to client before the node exits. """
-        if self.port == None or not self.port.is_open:
+        if self.port == None or not self.port.writable():
             return
         
         with self.read_lock:
@@ -217,7 +214,6 @@ class SerialClient(object):
                 with self.read_lock:
                     received = self.port.read(bytes_remaining)
                 if len(received) != 0:
-                    self.last_read = rospy.Time.now()
                     result.extend(received)
                     bytes_remaining -= len(received)
 
@@ -247,7 +243,7 @@ class SerialClient(object):
         while self.write_thread.is_alive() and not rospy.is_shutdown():
             if (rospy.Time.now() - self.lastsync).to_sec() > (self.timeout):
                 if self.synced:
-                    rospy.logerr("Lost sync with device, restarting...")
+                    rospy.logerr("Lost sync with device %s, restarting..." % self.com_port)
                 else:
                     rospy.logerr("Unable to sync with device %s; possible link problem or wrong node_handle's frequency." % self.com_port)
                 self.requestTopics()
@@ -321,7 +317,6 @@ class SerialClient(object):
                 # Validate checksum.
                 if checksum % 256 == 255:
                     self.synced = True
-                    self.lastsync_success = rospy.Time.now()
                     try:
                         self.callbacks[topic_id](msg)
                     except KeyError:
@@ -401,12 +396,11 @@ class SerialClient(object):
         Assumes the data is formatting as a packet. http://wiki.ros.org/rosserial/Overview/Protocol
         """
         with self.write_lock:
-            if self.port.is_open:
+            if self.port.writable():
                 self.port.write(data)
             else:
-                rospy.logerr("Port is closed while writing. Device %s." % self.com_port)
-        self.last_write = rospy.Time.now()
-        
+                rospy.logerr("Port is un-writable while writing. Device %s." % self.com_port)
+          
     def _send(self, topic, msg_bytes):
         """
         Send a message on a particular topic to the device.
