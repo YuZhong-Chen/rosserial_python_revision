@@ -119,6 +119,8 @@ class SerialClient(object):
         self.com_port = port
         self.com_baud = baud
         
+        self.UpdateRate = rospy.Rate(20)
+        
         self.isMega2560 = isMega2560
         
         self.reconnect_count = 0
@@ -165,7 +167,7 @@ class SerialClient(object):
                     while not rospy.is_shutdown():
                         try:
                             # First connect to the serial port.
-                            if self.port == None:
+                            if self.port == None or not self.port.isOpen():
                                 self.port = Serial(self.com_port, self.com_baud, timeout=0)
                                 time.sleep(1)
                             
@@ -196,7 +198,7 @@ class SerialClient(object):
         
     def txStopRequest(self):
         """ Send stop tx request to client before the node exits. """
-        if self.port == None or not self.port.writable():
+        if self.port == None or not self.port.writable() or not self.port.isOpen():
             return
         
         with self.read_lock:
@@ -256,7 +258,7 @@ class SerialClient(object):
                 # If the device not transmitted, pass.
                 with self.read_lock:
                     if self.port.inWaiting() < 1:
-                        time.sleep(0.001)
+                        self.UpdateRate.sleep()
                         continue
 
                 # Find sync flag.
