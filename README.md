@@ -14,5 +14,5 @@ where is located in the node_handle.h with ```SYNC_SECONDS```.
 You should install rosserial_msgs.  
 
 ```=
-sudo apt install ros-noetic-rosserial_msgs
+sudo apt install ros-noetic-rosserial-msgs
 ```  
